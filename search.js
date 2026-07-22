@@ -112,13 +112,13 @@ router.post('/', async (req, res) => {
     const searxResult = await searxngSearch(query);
     if (searxResult) return res.json(searxResult);
 
-    // 尝试 DuckDuckGo
+    // 尝试 DuckDuckGo API
     const ddgResult = await ddgSearch(query);
-    if (ddgResult) return res.json(ddgResult);
+    if (ddgResult?.success) return res.json(ddgResult);
 
     // 尝试 DuckDuckGo HTML 抓取
     const htmlResult = await ddgHtmlSearch(query);
-    if (htmlResult) return res.json(htmlResult);
+    if (htmlResult?.success) return res.json(htmlResult);
 
     // 全部失败
     return res.json({ results: [], source: 'none', success: false });
