@@ -14,17 +14,23 @@ function formatResults(items) {
 async function searxngSearch(query) {
   const instances = [
     'https://searx.be',
+    'https://search.bus-hit.me',
+    'https://searx.tuxcloud.net',
     'https://search.sapti.me',
-    'https://searx.work',
     'https://searxng.site',
+    'https://searx.work',
+    'https://search.mdosch.de',
   ];
   for (const instance of instances) {
     try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
       const params = new URLSearchParams({ q: query, format: 'json', language: 'zh', categories: 'general' });
       const resp = await fetch(`${instance}/search?${params}`, {
-        signal: AbortSignal.timeout(8000),
+        signal: ctrl.signal,
         headers: { Accept: 'application/json' },
       });
+      clearTimeout(t);
       if (!resp.ok) continue;
       const data = await resp.json();
       if (data.results?.length > 0) {
@@ -38,11 +44,14 @@ async function searxngSearch(query) {
 // DuckDuckGo Instant Answer
 async function ddgSearch(query) {
   try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
     const params = new URLSearchParams({ q: query, format: 'json', no_html: '1', skip_disambig: '1' });
     const resp = await fetch(`https://api.duckduckgo.com/?${params}`, {
-      signal: AbortSignal.timeout(5000),
+      signal: ctrl.signal,
       headers: { Accept: 'application/json' },
     });
+    clearTimeout(t);
     if (!resp.ok) return null;
     const data = await resp.json();
     const summary = (data.AbstractText || data.Abstract || '').trim();
@@ -59,6 +68,40 @@ async function ddgSearch(query) {
   } catch { return null; }
 }
 
+// DuckDuckGo HTML 搜索（兜底 — 解析HTML搜索结果）
+async function ddgHtmlSearch(query) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const resp = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      signal: ctrl.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    clearTimeout(t);
+    if (!resp.ok) return null;
+    const html = await resp.text();
+    // 简易HTML解析：提取链接和摘要
+    const results = [];
+    const linkRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi;
+    const snippetRegex = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+    let m;
+    const links = [];
+    while ((m = linkRegex.exec(html)) !== null) {
+      links.push({ url: m[1], title: m[2].replace(/<[^>]*>/g, '').trim() });
+    }
+    const snippets = [];
+    while ((m = snippetRegex.exec(html)) !== null) {
+      snippets.push(m[1].replace(/<[^>]*>/g, '').trim());
+    }
+    for (let i = 0; i < Math.min(links.length, snippets.length, 8); i++) {
+      results.push({ title: links[i].title, url: links[i].url, snippet: snippets[i] });
+    }
+    return results.length > 0 
+      ? { results, source: 'duckduckgo', success: true }
+      : null;
+  } catch { return null; }
+}
+
 // POST /search  — App端通过云端代理执行搜索
 router.post('/', async (req, res) => {
   try {
@@ -72,6 +115,10 @@ router.post('/', async (req, res) => {
     // 尝试 DuckDuckGo
     const ddgResult = await ddgSearch(query);
     if (ddgResult) return res.json(ddgResult);
+
+    // 尝试 DuckDuckGo HTML 抓取
+    const htmlResult = await ddgHtmlSearch(query);
+    if (htmlResult) return res.json(htmlResult);
 
     // 全部失败
     return res.json({ results: [], source: 'none', success: false });
