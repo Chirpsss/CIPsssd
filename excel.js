@@ -28,13 +28,26 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const buffer = await workbook.xlsx.writeBuffer();
+    // ✅ v6.3: 加固 — 验证 buffer 非空
+    let buffer;
+    try {
+      buffer = await workbook.xlsx.writeBuffer();
+    } catch (writeErr) {
+      console.error('Excel writeBuffer error:', writeErr.message);
+      return res.status(500).json({ error: `表格生成失败: ${writeErr.message}` });
+    }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}.xlsx"`);
-    res.send(buffer);
+    if (!buffer || buffer.length === 0) {
+      console.error('Excel: writeBuffer returned empty buffer');
+      return res.status(500).json({ error: '表格生成失败：文件为空' });
+    }
+
+    console.log(`Excel generated: ${buffer.length} bytes → ${filename}.xlsx`);
+    const base64 = Buffer.from(buffer).toString('base64');
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(base64);
   } catch (error) {
-    console.error('Excel error:', error.message);
+    console.error('Excel error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 });

@@ -35,14 +35,25 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const data = await pptx.write({ outputType: 'base64' });
-    const buffer = Buffer.from(typeof data === 'string' ? data : '', 'base64');
+    // ✅ v6.3: 加固 — 验证 base64 非空
+    let base64;
+    try {
+      base64 = await pptx.write({ outputType: 'base64' });
+    } catch (writeErr) {
+      console.error('PPT write error:', writeErr.message);
+      return res.status(500).json({ error: `演示文稿生成失败: ${writeErr.message}` });
+    }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}.pptx"`);
-    res.send(buffer);
+    if (!base64 || base64.length < 100) {
+      console.error('PPT: write returned empty/invalid base64');
+      return res.status(500).json({ error: '演示文稿生成失败：文件为空' });
+    }
+
+    console.log(`PPT generated: base64 ${base64.length} chars → ${filename}.pptx`);
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(base64);
   } catch (error) {
-    console.error('PPT error:', error.message);
+    console.error('PPT error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 });

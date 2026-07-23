@@ -27,13 +27,27 @@ router.post('/', async (req, res) => {
     }
 
     const doc = new Document({ sections: [{ children }] });
-    const buffer = await Packer.toBuffer(doc);
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}.docx"`);
-    res.send(buffer);
+    // ✅ v6.3: 加固 — 验证 buffer 非空再返回
+    let buffer;
+    try {
+      buffer = await Packer.toBuffer(doc);
+    } catch (packErr) {
+      console.error('Word Packer.toBuffer error:', packErr.message);
+      return res.status(500).json({ error: `文档生成失败: ${packErr.message}` });
+    }
+
+    if (!buffer || buffer.length === 0) {
+      console.error('Word: Packer.toBuffer returned empty buffer');
+      return res.status(500).json({ error: '文档生成失败：文件为空' });
+    }
+
+    console.log(`Word generated: ${buffer.length} bytes → ${filename}.docx`);
+    const base64 = buffer.toString('base64');
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(base64);
   } catch (error) {
-    console.error('Word error:', error.message);
+    console.error('Word error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 });

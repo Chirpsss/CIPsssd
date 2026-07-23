@@ -21,11 +21,17 @@ router.post('/', async (req, res) => {
     }
     html += '</body></html>';
 
+    if (!html || html.length < 50) {
+      console.error('PDF: empty HTML generated');
+      return res.status(500).json({ error: 'PDF生成失败：内容为空' });
+    }
+
+    console.log(`PDF HTML generated: ${html.length} chars → ${filename}.html`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}.html"`);
     res.send(html);
   } catch (error) {
-    console.error('PDF error:', error.message);
+    console.error('PDF error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 });
