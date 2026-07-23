@@ -43,9 +43,9 @@ router.post('/', async (req, res) => {
     }
 
     console.log(`Word generated: ${buffer.length} bytes → ${filename}.docx`);
-    const base64 = buffer.toString('base64');
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(base64);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}.docx"`);
+    res.send(buffer);
   } catch (error) {
     console.error('Word error:', error.message, error.stack);
     res.status(500).json({ error: error.message });

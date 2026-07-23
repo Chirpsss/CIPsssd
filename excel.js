@@ -43,9 +43,9 @@ router.post('/', async (req, res) => {
     }
 
     console.log(`Excel generated: ${buffer.length} bytes → ${filename}.xlsx`);
-    const base64 = Buffer.from(buffer).toString('base64');
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(base64);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+    res.send(Buffer.from(buffer));
   } catch (error) {
     console.error('Excel error:', error.message, error.stack);
     res.status(500).json({ error: error.message });

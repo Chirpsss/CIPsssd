@@ -35,23 +35,24 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // ✅ v6.3: 加固 — 验证 base64 非空
-    let base64;
+    // ✅ v6.4: 返回二进制 buffer
+    let buffer;
     try {
-      base64 = await pptx.write({ outputType: 'base64' });
+      buffer = await pptx.write({ outputType: 'nodebuffer' });
     } catch (writeErr) {
       console.error('PPT write error:', writeErr.message);
       return res.status(500).json({ error: `演示文稿生成失败: ${writeErr.message}` });
     }
 
-    if (!base64 || base64.length < 100) {
-      console.error('PPT: write returned empty/invalid base64');
+    if (!buffer || buffer.length === 0) {
+      console.error('PPT: write returned empty buffer');
       return res.status(500).json({ error: '演示文稿生成失败：文件为空' });
     }
 
-    console.log(`PPT generated: base64 ${base64.length} chars → ${filename}.pptx`);
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(base64);
+    console.log(`PPT generated: ${buffer.length} bytes → ${filename}.pptx`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}.pptx"`);
+    res.send(buffer);
   } catch (error) {
     console.error('PPT error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
